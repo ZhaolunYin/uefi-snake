@@ -1,2 +1,4 @@
 /target
 /esp
+/result-fd
+run.sh

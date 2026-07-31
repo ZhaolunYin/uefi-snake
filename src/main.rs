@@ -4,104 +4,24 @@
 #[global_allocator]
 static ALLOCATOR: uefi::allocator::Allocator = uefi::allocator::Allocator;
 
+mod draw;
+mod fruit;
 mod shapes;
 mod snake;
 
 extern crate alloc;
-use alloc::vec;
 use alloc::vec::Vec;
+use alloc::format;
 use core::time::Duration;
 use uefi::prelude::*;
-use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
+use uefi::proto::console::gop::{BltPixel, GraphicsOutput};
 use uefi::proto::console::text::{Input, Key, ScanCode};
 use uefi::{Result, boot};
 
-use crate::shapes::{Point, Rectangle, Grid};
+use crate::fruit::Fruit;
+use crate::shapes::{Rectangle, Grid};
 use crate::snake::{Body, Direction, Head};
-
-struct Fruit {
-    rect: Rectangle,
-    color: BltPixel,
-    seed: usize,
-}
-
-impl Fruit {
-    fn new(grid: &Grid, mut seed: usize) -> Self {
-        seed = seed
-            .wrapping_mul(1664525)
-            .wrapping_add(1013904223);
-        let x = (seed % grid.width) * grid.cell_size;
-        seed = seed
-            .wrapping_mul(1664525)
-            .wrapping_add(1013904223);
-        let y = (seed % grid.height) * grid.cell_size;
-        Self {
-            rect: Rectangle {
-                x: x,
-                y: y,
-                width: grid.cell_size,
-                height: grid.cell_size,
-            },
-            color: BltPixel::new(255, 0, 0),
-            seed,
-        }
-    }
-}
-
-struct Buffer {
-    width: usize,
-    height: usize,
-    pixels: Vec<BltPixel>
-}
-
-impl Buffer {
-    fn new(width: usize, height: usize) -> Self {
-        Self {
-            width,
-            height,
-            pixels: vec![BltPixel::new(0,0,0); width * height]
-        }
-    }
-
-    fn pixel(&mut self, p: Point) -> Option<&mut BltPixel> {
-        if p.x >= self.width || p.y >= self.height {
-            return None;
-        }
-        self.pixels.get_mut(p.y * self.width + p.x)
-    }
-
-    fn blit(&self, gop: &mut GraphicsOutput) -> uefi::Result {
-        gop.blt(BltOp::BufferToVideo {
-            buffer: &self.pixels,
-            src: BltRegion::Full,
-            dest: (0, 0),
-            dims: (self.width, self.height)
-        })
-    }
-
-    fn draw_rect(&mut self, rect: &Rectangle, color: BltPixel) {
-        for py in rect.y..rect.y + rect.height {
-            for px in rect.x..rect.x + rect.width {
-                if let Some(pixel) = self.pixel(Point {x: px, y: py}) {
-                    *pixel = color;
-                }
-            }
-        }
-    }
-}
-
-
-fn move_tail(tail: &mut Vec<Body>, head: &Head) {
-    if !tail.is_empty() {
-        for i in (1..tail.len()).rev() {
-            tail[i].rect.x = tail[i - 1].rect.x;
-            tail[i].rect.y = tail[i - 1].rect.y;
-        }
-        tail[0].rect.x = head.rect.x;
-        tail[0].rect.y = head.rect.y;
-    }
-}
-
+use crate::draw::Buffer;
 
 fn game_loop() -> Result {
     uefi::println!("looking up GraphicsOutput");
@@ -143,7 +63,7 @@ fn game_loop() -> Result {
             }
         }
 
-        move_tail(&mut tail, &head);
+        snake::move_tail(&mut tail, &head);
         if !head.move_head(&dir, &grid, &tail) {
             break;
         }
@@ -163,6 +83,8 @@ fn game_loop() -> Result {
             buffer.draw_rect(&segment.rect, BltPixel::new(255, 255, 0))
         }
         buffer.draw_rect(&head.rect, BltPixel::new(0, 255, 0));
+
+        buffer.draw_string(grid.scale * 2, grid.scale * 2, format!("Score: {}", tail.len()).as_str(), grid.scale * 2);
 
         buffer.blit(&mut gop)?;
         buffer.pixels.fill(BltPixel::new(0, 0, 0));

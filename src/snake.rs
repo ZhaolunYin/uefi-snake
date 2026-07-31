@@ -1,5 +1,5 @@
-use alloc::vec;
 use alloc::vec::Vec;
+use uefi::proto::console::gop::BltPixel;
 
 use crate::shapes::{self, Rectangle, Point, Grid};
 
@@ -7,7 +7,7 @@ pub enum Direction { Up, Down, Left, Right }
 
 pub struct Body {
     pub rect: Rectangle,
-    pub lastpos: Point
+    pub lastpos: Point,
 }
 
 pub struct Head {
@@ -48,5 +48,16 @@ impl Head {
             if shapes::check_collision(&self.rect, &segment.rect) { return false; }
         }
         true
+    }
+}
+
+pub fn move_tail(tail: &mut Vec<Body>, head: &Head) {
+    if !tail.is_empty() {
+        for i in (1..tail.len()).rev() {
+            tail[i].rect.x = tail[i - 1].rect.x;
+            tail[i].rect.y = tail[i - 1].rect.y;
+        }
+        tail[0].rect.x = head.rect.x;
+        tail[0].rect.y = head.rect.y;
     }
 }

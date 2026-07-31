@@ -14,6 +14,7 @@ pub struct Rectangle {
 
 pub struct Grid {
     pub cell_size: usize,
+    pub scale: usize,
     pub width: usize,
     pub height: usize,
 }
@@ -25,6 +26,7 @@ impl Grid {
         let cell_size = scale * 40;
         Self {
             cell_size,
+            scale,
             width: screenwidth / cell_size,
             height: screenheight / cell_size,
         }
