@@ -21,9 +21,16 @@ pub struct Grid {
 
 impl Grid {
     pub fn new(screenwidth: usize, screenheight: usize) -> Self{
-        const REF: usize = 1080 * 1920;
-        let scale = (((screenwidth * screenheight) + (REF / 2)) / REF).max(1);
-        let cell_size = scale * 40;
+        let scale: f32 = match screenheight {
+            0..=1079 => 1.0,
+            1080..=2159 => 1.5,
+            _ => 2.0,
+        };
+        let cell_size = (scale * 40.0) as usize;
+        let scale: usize = match scale {
+            1.0 => 1,
+            _ => 2,
+        };
         Self {
             cell_size,
             scale,

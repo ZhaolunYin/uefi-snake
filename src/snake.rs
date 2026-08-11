@@ -1,13 +1,18 @@
 use alloc::vec::Vec;
-use uefi::proto::console::gop::BltPixel;
 
 use crate::shapes::{self, Rectangle, Point, Grid};
 
+#[derive(Clone)]
+#[derive(PartialEq)]
 pub enum Direction { Up, Down, Left, Right }
 
-pub struct Body {
-    pub rect: Rectangle,
-    pub lastpos: Point,
+impl Direction {
+    pub fn opposite(&self, other: &Direction) -> bool {
+        (*self == Direction::Up && *other == Direction::Down) ||
+            (*self == Direction::Down && *other == Direction::Up) ||
+            (*self == Direction::Right && *other == Direction::Left) ||
+            (*self == Direction::Left && *other == Direction::Right)
+    }
 }
 
 pub struct Head {
@@ -24,7 +29,7 @@ impl Head {
         }
     }
 
-    pub fn move_head(&mut self, d: &Direction, grid: &Grid, tail: &Vec<Body>) -> bool {
+    pub fn move_head(&mut self, d: &Direction, grid: &Grid, tail: &Vec<Rectangle>) -> bool {
         self.lastpos = Point {x: self.rect.x, y: self.rect.y};
         match d {
             Direction::Up => {
@@ -45,19 +50,19 @@ impl Head {
             }
         }
         for segment in tail {
-            if shapes::check_collision(&self.rect, &segment.rect) { return false; }
+            if shapes::check_collision(&self.rect, &segment) { return false; }
         }
         true
     }
 }
 
-pub fn move_tail(tail: &mut Vec<Body>, head: &Head) {
+pub fn move_tail(tail: &mut Vec<Rectangle>, head: &Head) {
     if !tail.is_empty() {
         for i in (1..tail.len()).rev() {
-            tail[i].rect.x = tail[i - 1].rect.x;
-            tail[i].rect.y = tail[i - 1].rect.y;
+            tail[i].x = tail[i - 1].x;
+            tail[i].y = tail[i - 1].y;
         }
-        tail[0].rect.x = head.rect.x;
-        tail[0].rect.y = head.rect.y;
+        tail[0].x = head.rect.x;
+        tail[0].y = head.rect.y;
     }
 }

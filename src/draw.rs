@@ -1,22 +1,26 @@
 use alloc::vec;
 use alloc::vec::Vec;
 use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
-use font8x8::{UnicodeFonts, BASIC_FONTS};
+use uefi::boot::ScopedProtocol;
+use font8x8::UnicodeFonts;
 
 use crate::shapes::{Rectangle, Point};
+use crate::constants::{FONT, FONT_WIDTH, FONT_HEIGHT};
 
 pub struct Buffer {
     pub width: usize,
     pub height: usize,
-    pub pixels: Vec<BltPixel>
+    pub pixels: Vec<BltPixel>,
+    pub gop: ScopedProtocol<GraphicsOutput>,
 }
 
 impl Buffer {
-    pub fn new(width: usize, height: usize) -> Self {
+    pub fn new(width: usize, height: usize, gop: ScopedProtocol<GraphicsOutput>) -> Self {
         Self {
             width,
             height,
-            pixels: vec![BltPixel::new(0,0,0); width * height]
+            pixels: vec![BltPixel::new(0,0,0); width * height],
+            gop,
         }
     }
 
@@ -27,8 +31,8 @@ impl Buffer {
         self.pixels.get_mut(p.y * self.width + p.x)
     }
 
-    pub fn blit(&self, gop: &mut GraphicsOutput) -> uefi::Result {
-        gop.blt(BltOp::BufferToVideo {
+    pub fn blit(&mut self) -> uefi::Result {
+        self.gop.blt(BltOp::BufferToVideo {
             buffer: &self.pixels,
             src: BltRegion::Full,
             dest: (0, 0),
@@ -45,10 +49,10 @@ impl Buffer {
             }
         }
     }
-    fn draw_char(&mut self, x: usize, y: usize, c: char, size: usize) {
-        if let Some(glyph) = BASIC_FONTS.get(c) {
+    fn draw_char(&mut self, x: usize, y: usize, c: char, size: usize, color: BltPixel) {
+        if let Some(glyph) = FONT.get(c) {
             for (row, bits) in glyph.iter().enumerate() {
-                for col in 0..8 {
+                for col in 0..FONT_WIDTH {
                     if bits & (1 << col) != 0 {
                         // Draw a size×size block for this font pixel
                         for dy in 0..size {
@@ -57,7 +61,7 @@ impl Buffer {
                                     x: x + col * size + dx,
                                     y: y + row * size + dy,
                                 }) {
-                                    *pixel = BltPixel::new(255, 255, 255);
+                                    *pixel = color;
                                 }
                             }
                         }
@@ -66,10 +70,21 @@ impl Buffer {
             }
         }
     }
-    pub fn draw_string(&mut self, x: usize, y: usize, text: &str, size: usize) {
+    pub fn draw_string(&mut self, x: usize, y: usize, text: &str, size: usize, color: BltPixel) {
         for (i, c) in text.chars().enumerate() {
-            self.draw_char(x + (i * 8 * size), y, c, size);
+            self.draw_char(x + (i * FONT_WIDTH * size), y, c, size, color);
         }
     }
-
+}
+pub fn lerp_color(a: BltPixel, b: BltPixel, t: f32) -> BltPixel {
+    let t = t.clamp(0.0, 1.0);
+    let r: u8 = (a.red as f32 * (1.0 - t) + b.red as f32 * t) as u8;
+    let g: u8 = (a.green as f32 * (1.0- t) + b.green as f32 * t) as u8;
+    let b: u8 = (a.blue as f32 * (1.0 - t) + b.blue as f32 * t) as u8;
+    BltPixel::new(r, g, b)
+}
+pub fn string_dimensions(s: &str, scale: usize) -> (usize, usize) {
+    let width = s.chars().count() * scale * FONT_WIDTH;
+    let height = FONT_HEIGHT * scale;
+    (width, height)
 }

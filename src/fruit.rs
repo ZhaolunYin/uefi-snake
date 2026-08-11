@@ -8,7 +8,7 @@ pub struct Fruit {
 }
 
 impl Fruit {
-    pub fn new(grid: &Grid, mut seed: usize) -> Self {
+    pub fn new(grid: &Grid, mut seed: usize, color: BltPixel) -> Self {
         seed = seed
             .wrapping_mul(1664525)
             .wrapping_add(1013904223);
@@ -24,7 +24,7 @@ impl Fruit {
                 width: grid.cell_size,
                 height: grid.cell_size,
             },
-            color: BltPixel::new(255, 0, 0),
+            color,
             seed,
         }
     }
